@@ -1,0 +1,27 @@
+name: ForumConnector
+
+main: me.SgtMjrME.ForumConnector
+version: 0.41
+author: SergeantMajorME 
+
+description: forum thing
+depends: [PermissionsEx]
+
+commands:
+    fc:
+    password:
+    resetpassword:
+
+permissions:
+    fc.demigod:
+    fc.empress:
+    fc.queen:
+    fc.king:
+    fc.lady:
+    fc.lord:
+    fc.maiden:
+    fc.knight:
+    fc.merchant:
+    fc.helper:
+    fc.mod:
+    fc.admin:
