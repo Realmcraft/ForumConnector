@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.util.Random;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -21,17 +22,17 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class ForumConnector extends JavaPlugin implements Listener{
 	
-	Random r = new Random();
+	static Random r = new Random();
 	String host;
 	String port;
 	String username;
 	String password;
 	String database;
-	MySQLDatabase mySQLDatabase = null;
+	static MySQLDatabase mySQLDatabase = null;
 	int nextid;
 	Timestamp defTime;
-	private String joinMessage;
-	char[] vchar;
+	private String[] joinMessage;
+	static char[] vchar;
 	final String zvalue = "0000-00-00 00:00:00";
 	Date d;
 	
@@ -46,7 +47,11 @@ public class ForumConnector extends JavaPlugin implements Listener{
 			username = config.getString("username", "root");
 			password = config.getString("password", "root");
 			database = config.getString("database", null);
-			joinMessage = config.getString("joinmessage", "Join the forums today!");
+			String tempString = config.getString("joinmessage", "Join the forums today!");
+			tempString = ChatColor.translateAlternateColorCodes('&', tempString);
+			joinMessage = tempString.split("%n%");
+			Bukkit.getLogger().info("Join message ");
+			for(String s : joinMessage) Bukkit.getLogger().info(s);
 			mySQLDatabase = new MySQLDatabase(host, port, username, password, database);
 			mySQLDatabase.open();
 			vchar = new char[26];
@@ -68,7 +73,7 @@ public class ForumConnector extends JavaPlugin implements Listener{
 		}
 	}
 	
-	private String MD5(String md5) {
+	private static String MD5(String md5) {
 		   try {
 		        java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
 		        md.update(md5.getBytes());
@@ -83,7 +88,7 @@ public class ForumConnector extends JavaPlugin implements Listener{
 		    return null;
 		}
 	
-	private String generatePassword(String A){
+	static private String generatePassword(String A){
 		try{
 		String B = "";
 		for(int i = 0; i < 32; i++) B += vchar[r.nextInt(24)];
@@ -95,25 +100,38 @@ public class ForumConnector extends JavaPlugin implements Listener{
 		return null;
 	}
 	
+	static public String generateRandomPassword(String pname){
+		String randPass = "";
+		try {
+			randPass = "";
+			for(int i = 0; i < 10; i++){
+				randPass += vchar[r.nextInt(24)];
+			}
+			String storedPass = ForumConnector.generatePassword(randPass);
+			mySQLDatabase.update("UPDATE web_users SET password = '" + storedPass + "' WHERE username = '" + pname + "';");
+//			p.sendMessage("Your password has been reset.  It is now " + randPass);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return randPass;
+	}
+	
 	@Override
 	public boolean onCommand(CommandSender snd, Command cmd, String label, String[] args){
 		if (!(snd instanceof Player)) return false;
 		Player p = (Player) snd;
 		if (label.equalsIgnoreCase("resetpassword") || label.equalsIgnoreCase("password")){
-			try {
-				String randPass = "";
-				for(int i = 0; i < 10; i++){
-					randPass += vchar[r.nextInt(24)];
-				}
-				String storedPass = generatePassword(randPass);
-				mySQLDatabase.update("UPDATE web_users SET password = '" + storedPass + "' WHERE username = '" + p.getName() + "';");
-				p.sendMessage("Your password has been reset.  It is now " + randPass);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			String randPass = generateRandomPassword(p.getName());
+			p.sendMessage("Your password has been reset.  It is now " + randPass);
 		}
 		return true;
 	}
+	
+//	@EventHandler(priority = EventPriority.HIGHEST)
+//	public void onKick(PlayerKickEvent e){
+//		e.getReason().contains("Banned");
+//		e.setReason(e.getReason() + " pass: ");
+//	}
 	
 	@EventHandler(priority = EventPriority.MONITOR)
 	public void onJoin(PlayerJoinEvent e){
@@ -125,14 +143,13 @@ public class ForumConnector extends JavaPlugin implements Listener{
 				Timestamp ts = res.getTimestamp("lastvisitDate");
 				if (ts.before(d)){
 					//Hope this works
-					e.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&', joinMessage));
 					String randPass = "";
 					for(int i = 0; i < 10; i++){
 						randPass += vchar[r.nextInt(24)];
 					}
 					String storedPass = MD5(randPass);
 					mySQLDatabase.update("UPDATE web_users SET password = '" + storedPass + "' WHERE username = '" + e.getPlayer().getName() + "';");
-					e.getPlayer().sendMessage(ChatColor.GRAY + "Your temporary password is " + randPass);
+					sendJoinMessage(e.getPlayer(), randPass);
 				}
 			}
 			else{
@@ -163,8 +180,7 @@ public class ForumConnector extends JavaPlugin implements Listener{
 
 					@Override
 					public void run() {
-						p.sendMessage(ChatColor.translateAlternateColorCodes('&', joinMessage));
-						p.sendMessage(ChatColor.GRAY + "Your temporary password is " + passOut);
+						sendJoinMessage(p, passOut);
 					}
 					
 				}, 200);
@@ -190,9 +206,17 @@ public class ForumConnector extends JavaPlugin implements Listener{
 		} catch(Exception er){er.printStackTrace();}
 	}
 	
+	private void sendJoinMessage(Player player, String randPass) {
+		String[] out = joinMessage;
+		for(String s : out){
+			s = s.replace("%pass%", randPass);
+			player.sendMessage(s);
+		}
+	}
+
 	private void updateRank(Player p, int rank){
 		try {
-			mySQLDatabase.update("UPDATE web_kuena_users SET rank = " + rank + " WHERE id IN (SELECT * FROM web_users WHERE username = '" + p.getName() + "')");
+			mySQLDatabase.update("UPDATE web_kunena_users SET rank = " + rank + " WHERE userid IN (SELECT id FROM web_users WHERE username = '" + p.getName() + "')");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -14,14 +14,28 @@ commands:
 
 permissions:
     fc.demigod:
+        default: false
     fc.empress:
+        default: false
+    fc.emperor:
+        default: false
     fc.queen:
+        default: false
     fc.king:
+        default: false
     fc.lady:
+        default: false
     fc.lord:
+        default: false
     fc.maiden:
+        default: false
     fc.knight:
+        default: false
     fc.merchant:
+        default: false
     fc.helper:
+        default: false
     fc.mod:
+        default: false
     fc.admin:
+        default: false
