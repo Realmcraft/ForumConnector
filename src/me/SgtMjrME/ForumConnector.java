@@ -153,7 +153,9 @@ public class ForumConnector extends JavaPlugin implements Listener{
 			if (res.next()){
 				//Person found
 				String ts = res.getString("lastvisitDate");
-				if (ts.startsWith("0000")){
+				int year = 0;
+				if (ts != null) year = Integer.parseInt(ts);
+				if (year < 1980){//This is to deal with both 0000 and 1975 cases
 					//Hope this works
 					String randPass = "";
 					for(int i = 0; i < 10; i++){
@@ -164,6 +166,7 @@ public class ForumConnector extends JavaPlugin implements Listener{
 					sendJoinMessage(e.getPlayer(), randPass);
 				}
 				else{
+					//Player has logged onto the forums, need to check update.
 					needCitizenPlus = true;
 				}
 			}
