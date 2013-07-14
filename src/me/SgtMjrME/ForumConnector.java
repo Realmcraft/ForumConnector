@@ -22,22 +22,24 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class ForumConnector extends JavaPlugin implements Listener{
 	
+	public static ForumConnector instance;
 	static Random r = new Random();
 	String host;
 	String port;
 	String username;
 	String password;
 	String database;
+	String citizenPlusPexGroup;
 	static MySQLDatabase mySQLDatabase = null;
 	int nextid;
 	Timestamp defTime;
 	private String[] joinMessage;
 	static char[] vchar;
-	final String zvalue = "0000-00-00 00:00:00";
 	Date d;
 	
 	@Override
 	public void onEnable(){
+		instance = this;
 		getServer().getPluginManager().registerEvents(this, this);
 		YamlConfiguration config = new YamlConfiguration();
 		try {
@@ -47,6 +49,7 @@ public class ForumConnector extends JavaPlugin implements Listener{
 			username = config.getString("username", "root");
 			password = config.getString("password", "root");
 			database = config.getString("database", null);
+			citizenPlusPexGroup = config.getString("citizenplus", "");
 			String tempString = config.getString("joinmessage", "Join the forums today!");
 			tempString = ChatColor.translateAlternateColorCodes('&', tempString);
 			joinMessage = tempString.split("%n%");
@@ -100,15 +103,24 @@ public class ForumConnector extends JavaPlugin implements Listener{
 		return null;
 	}
 	
-	static public String generateRandomPassword(String pname){
+	static public String generateRandomPassword(final String pname){
 		String randPass = "";
 		try {
 			randPass = "";
 			for(int i = 0; i < 10; i++){
 				randPass += vchar[r.nextInt(24)];
 			}
-			String storedPass = ForumConnector.generatePassword(randPass);
-			mySQLDatabase.update("UPDATE web_users SET password = '" + storedPass + "' WHERE username = '" + pname + "';");
+			final String storedPass = ForumConnector.generatePassword(randPass);
+			Bukkit.getScheduler().runTaskAsynchronously(ForumConnector.instance, new Runnable(){
+				@Override
+				public void run(){
+					try {
+						mySQLDatabase.update("UPDATE web_users SET password = '" + storedPass + "' WHERE username = '" + pname + "';");
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			});
 //			p.sendMessage("Your password has been reset.  It is now " + randPass);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -134,8 +146,9 @@ public class ForumConnector extends JavaPlugin implements Listener{
 //	}
 	
 	@EventHandler(priority = EventPriority.MONITOR)
-	public void onJoin(PlayerJoinEvent e){
+	public void onJoin(final PlayerJoinEvent e){
 		if (mySQLDatabase == null) return;
+		boolean needCitizenPlus = false;
 		try {
 			ResultSet res = mySQLDatabase.query("SELECT * FROM web_users WHERE username = \"" + e.getPlayer().getName() + "\";");
 			if (res.next()){
@@ -150,6 +163,9 @@ public class ForumConnector extends JavaPlugin implements Listener{
 					String storedPass = MD5(randPass);
 					mySQLDatabase.update("UPDATE web_users SET password = '" + storedPass + "' WHERE username = '" + e.getPlayer().getName() + "';");
 					sendJoinMessage(e.getPlayer(), randPass);
+				}
+				else{
+					needCitizenPlus = true;
 				}
 			}
 			else{
@@ -168,11 +184,32 @@ public class ForumConnector extends JavaPlugin implements Listener{
 				for(int i = 0; i < 10; i++){
 					randPass += vchar[r.nextInt(24)];
 				}
-				String storedPass = generatePassword(randPass);
-				mySQLDatabase.create("INSERT INTO web_users(id, name, username, email, password, block, sendEmail, registerDate, lastvisitDate, activation, params, lastResetTime, resetCount)" +
-						"  VALUES(" + nextid + ", '" + e.getPlayer().getName() + "', '" + e.getPlayer().getName() + "', 'NA', '" + storedPass + "', 0, 0, NOW(), Timestamp('1975-01-01'), 0, " +
-								"\"{'admin_style':'','admin_language':'','language':'','editor':'','helpsite':'','timezone':''}\", Timestamp('1975-01-01'), 0);");
-				mySQLDatabase.create("INSERT INTO web_user_usergroup_map(user_id, group_id) VALUES(" + nextid + ", 2);");
+				final String storedPass = generatePassword(randPass);
+				Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable(){
+					@Override
+							public void run() {
+								try {
+									mySQLDatabase
+											.create("INSERT INTO web_users(id, name, username, email, password, block, sendEmail, registerDate, lastvisitDate, activation, params, lastResetTime, resetCount)"
+													+ "  VALUES("
+													+ nextid
+													+ ", '"
+													+ e.getPlayer().getName()
+													+ "', '"
+													+ e.getPlayer().getName()
+													+ "', 'NA', '"
+													+ storedPass
+													+ "', 0, 0, NOW(), Timestamp('1975-01-01'), 0, "
+													+ "\"{'admin_style':'','admin_language':'','language':'','editor':'','helpsite':'','timezone':''}\", Timestamp('1975-01-01'), 0);");
+									mySQLDatabase
+										.create("INSERT INTO web_user_usergroup_map(user_id, group_id) VALUES("
+												+ nextid + ", 2);");
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
+							}
+				});
+				
 //				res = mySQLDatabase.query("SELECT * FROM web_users WHERE username = \"" + e.getPlayer().getName() + "\";");
 				final Player p = e.getPlayer();
 				final String passOut = randPass;
@@ -203,9 +240,16 @@ public class ForumConnector extends JavaPlugin implements Listener{
 			else if (p.hasPermission("fc.maiden")) updateRank(p, 14);
 			else if (p.hasPermission("fc.knight")) updateRank(p, 13);
 			else if (p.hasPermission("fc.merchant")) updateRank(p, 12);
+			else if (needCitizenPlus) manageCitizenPlus(p);
 		} catch(Exception er){er.printStackTrace();}
 	}
 	
+	private void manageCitizenPlus(Player p) {
+		if (!citizenPlusPexGroup.equals("") && !p.hasPermission("fc.citizenplus")){
+			Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "pex group " + citizenPlusPexGroup + " user add " + p);
+		}
+	}
+
 	private void sendJoinMessage(Player player, String randPass) {
 		String[] out = joinMessage;
 		for(String s : out){
