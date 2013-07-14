@@ -53,7 +53,6 @@ public class ForumConnector extends JavaPlugin implements Listener{
 			String tempString = config.getString("joinmessage", "Join the forums today!");
 			tempString = ChatColor.translateAlternateColorCodes('&', tempString);
 			joinMessage = tempString.split("%n%");
-			Bukkit.getLogger().info("Join message ");
 			for(String s : joinMessage) Bukkit.getLogger().info(s);
 			mySQLDatabase = new MySQLDatabase(host, port, username, password, database);
 			mySQLDatabase.open();
@@ -153,8 +152,8 @@ public class ForumConnector extends JavaPlugin implements Listener{
 			ResultSet res = mySQLDatabase.query("SELECT * FROM web_users WHERE username = \"" + e.getPlayer().getName() + "\";");
 			if (res.next()){
 				//Person found
-				Timestamp ts = res.getTimestamp("lastvisitDate");
-				if (ts.before(d)){
+				String ts = res.getString("lastvisitDate");
+				if (ts.startsWith("0000")){
 					//Hope this works
 					String randPass = "";
 					for(int i = 0; i < 10; i++){
@@ -246,7 +245,10 @@ public class ForumConnector extends JavaPlugin implements Listener{
 	
 	private void manageCitizenPlus(Player p) {
 		if (!citizenPlusPexGroup.equals("") && !p.hasPermission("fc.citizenplus")){
-			Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "pex group " + citizenPlusPexGroup + " user add " + p);
+			Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "pex group " + citizenPlusPexGroup + " user add " + p.getName());
+		}
+		else if (citizenPlusPexGroup.equals("")){
+			Bukkit.getLogger().info("config citizenplus is null");
 		}
 	}
 
